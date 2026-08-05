@@ -10,6 +10,8 @@ Manual event registration through Microsoft Forms and Excel breaks down as soon 
 
 ## Architecture, and why each piece was chosen
 
+![Architecture diagram](architecture.png)
+
 - **API Gateway + Lambda, not a container or a monolith.** Registration traffic is bursty (spikes around an event announcement, near-silent otherwise) and the whole point of the Free Tier constraint is to pay for compute only when a request actually happens. A REST API on API Gateway routing to one Lambda per operation does exactly that, with the added benefit that each function can be given its own IAM role.
 - **DynamoDB, not RDS.** The access patterns here are all key-based (get an event by ID, get a registration by ID, list registrations for one event) with one cross-cutting lookup (find registrations by email, across events) — a textbook fit for a single-table-per-entity DynamoDB design with a Global Secondary Index for the one non-key access pattern, rather than paying for an always-on relational instance to run a handful of simple queries.
 - **Cognito, not a custom auth system.** Organizer-only endpoints (create an event, view all registrations, upload an image) need real authentication; Cognito issues JWTs that API Gateway's built-in authorizer validates natively, with zero custom auth code to write or secure.

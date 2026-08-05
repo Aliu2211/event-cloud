@@ -10,24 +10,9 @@ Manual event registration via forms and spreadsheets doesn't scale: no real-time
 
 ## Architecture
 
-```
-GitHub  ──push──>  GitHub Actions ──test + deploy──>  Terraform ──apply──> AWS
-                                                                              │
-                          ┌───────────────────────────────────────────────────┤
-                          │                                                   │
-                    API Gateway (REST)                                  AWS Budgets
-                          │                                            (Free Tier alert)
-                    16 Lambda functions (Python 3.12)
-                          │
-            ┌─────────────┼──────────────┬─────────────┐
-            │              │               │            │
-       DynamoDB        Cognito         SNS           S3
-   (events, regs,    (organizer     (registration   (event
-   sessions,          auth)         confirmations)   images)
-   speakers)
-            │
-      CloudWatch (logs + error-rate alarms per function)
-```
+![Architecture diagram](architecture.png)
+
+GitHub push triggers GitHub Actions, which runs the test suite then `terraform apply`s the whole stack. API Gateway fronts 16 Lambda functions, each with its own least-privilege IAM role; they read/write DynamoDB, authenticate organizers via Cognito, publish registration confirmations and CloudWatch alerts via SNS, and store event images in S3. CloudWatch tracks logs and per-function error-rate alarms; AWS Budgets watches spend. Editable source: `architecture.drawio` (open at [app.diagrams.net](https://app.diagrams.net)).
 
 Every function has its own IAM role scoped to only the table actions it actually performs (least privilege) — see `infrastructure/modules/lambda/main.tf`.
 
