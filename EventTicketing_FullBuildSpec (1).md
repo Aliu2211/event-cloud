@@ -1570,3 +1570,76 @@ On first login, Cognito prompts the organizer to set a permanent password.
 ---
 
 *Event Registration and Ticketing System | Phase 3 Dual Portal | Aliu Tijani | July 2026*
+
+---
+
+# Frontend Reconciliation Addendum
+
+Both frontends (`organizer-portal`, `public-portal`) were built against this spec using Stitch-derived UI designs before the backend existed. This addendum is the source of truth for Steps 1-7 and Step 21 going forward wherever it conflicts with anything implied by the mockups. Build the backend to match this section, not the decorative UI details below it.
+
+## Confirmed contract (build backend to match exactly)
+
+- **Event fields**: `event_id`, `event_name`, `description`, `date` (ISO `YYYY-MM-DD`), `location`, `capacity`, `registered_count`, `status`, `created_at`, `updated_at`. No ticket tiers, pricing, venue type, or branding fields exist anywhere in the system, since the organizer Configuration Studio's "Ticketing Inventory" and "Event Branding" sections are decorative mock UI from the Stitch export. Do not add those fields to `event_create`.
+- **Event status enum is exactly**: `available | limited | full | cancelled`, set automatically by the backend. `event_create` always sets `available`; `registration_create` recalculates `limited`/`full` at 80%/100% capacity. There is no "draft" state and no publish workflow: events go live immediately on creation. The organizer Configuration Studio's "Save as Draft" button and the Events list's "Draft" status badge are presentation-only relics from the Stitch mock. When wiring real data, bind "Publish Event" (not "Save as Draft") to `POST /events` and drop the draft badge/filter.
+- **Registration fields**: `event_id`, `registration_id`, `participant_name`, `email`, `phone` (optional), `registered_at`, `ticket_number`, `status` (`confirmed | cancelled` only, no "pending"). The organizer Attendees page's ticket-type pills (VIP Pass / Early Bird / General) and "Pending Payments" stat are decorative; there is no payment processing or ticket-tier concept anywhere in this system.
+- `public-portal/lib/api.ts` implements this contract exactly (`listEvents`, `getEvent`, `registerForEvent`, `getRegistration`, `getRegistrationsByEmail`, `listSessions`, `listSpeakers`, `getSpeaker`, `listSessionsBySpeaker`) and falls back to in-memory mock data whenever `NEXT_PUBLIC_API_URL` is unset. `public-portal/.env.local` now points this at the live deployed API (see Deployment status below), so it runs against real data by default in this environment.
+
+## Two registration endpoints added beyond the original Step 4/7 design
+
+Two gaps surfaced when the frontends were reviewed against the deployed API: the organizer Attendees page implies a platform-wide registrant list, and the public My Tickets page implies self-service lookup by email, neither of which the original 6 handlers support. Both are now real, deployed, and covered by `tests/test_api.py`:
+
+- **`GET /registrations`** maps to `registration_list_all`. Full scan of the registrations table, organizer-only (Cognito-gated), since it returns every attendee's name/email/phone across every event. Powers `organizer-portal`'s Attendees page, which is now wired to it directly (see Deployment status below).
+- **`GET /registrations/lookup?email=...`** maps to `registration_lookup_by_email`. Queries the `email-index` GSI (the same one `registration_create` already used server-side for duplicate detection, now also exposed to callers) and returns every registration for that one email across all events. Public, no auth: querying by an email you already know is the same trust model as any "look up my order" flow, and it can't be used to enumerate other attendees. Returns 400 if `email` is omitted. `public-portal/my-tickets` calls this directly through `lib/api.ts` now, no longer client-side mock filtering.
+
+Both live under the existing `/registrations` resource: `GET /registrations` (top-level, list-all) and `GET /registrations/lookup` (literal child, sibling to `{registration_id}`). API Gateway resolves the literal path ahead of the variable one, so there's no route conflict.
+
+## Sessions and speakers: a real feature, added after the initial build
+
+The original Step 1 data model has no concept of sessions or speakers; `/schedule` and `/speakers/[slug]` in `public-portal` originally rendered mock content only. This was deliberately promoted to a real feature (new tables, new endpoints, new frontend wiring), not left as decoration, after review. It follows the same partition-per-parent pattern as `events`/`registrations`.
+
+**New tables** (`infrastructure/modules/dynamodb`):
+- `sessions-{environment}`: partition key `event_id`, sort key `session_id`. GSI `speaker-index` (PK `speaker_id`) looks up all of a speaker's sessions across every event. `speaker_id` is omitted from the item entirely when a session has no speaker, since DynamoDB rejects empty strings as GSI key values, unlike ordinary attributes.
+- `speakers-{environment}`: partition key `speaker_id`. No sort key or GSI.
+
+**New endpoints** (all covered by `tests/test_api.py`, all CORS-enabled):
+- `POST /events/{event_id}/sessions` maps to `session_create` (organizer only). Required: `day`, `time`, `title`, `location`. Optional: `track`, `description`, `speaker_id`. Returns 404 if the event doesn't exist.
+- `GET /events/{event_id}/sessions` maps to `session_list` (public). Query by `event_id`, returns `{sessions, count}`.
+- `POST /speakers` maps to `speaker_create` (organizer only). Required: `name`, `role`. Optional: `bio`, `expertise` (array), `years_experience`, `talks_delivered`.
+- `GET /speakers` maps to `speaker_list` (public). Full scan, returns `{speakers, count}`.
+- `GET /speakers/{speaker_id}` maps to `speaker_get` (public). 404 if not found.
+- `GET /speakers/{speaker_id}/sessions` maps to `session_list_by_speaker` (public). Queries the `speaker-index` GSI, returns that speaker's sessions across every event.
+
+**Frontend**: `/schedule` moved from a flat, single-hardcoded-event route to `public-portal/app/events/[id]/schedule/page.tsx`, since sessions are genuinely per-event now. The event detail page's "View full schedule" link is no longer gated behind a single flagship event ID; every event links to its own schedule. `public-portal/app/speakers/[slug]` was renamed to `app/speakers/[id]` (the param is a `speaker_id`, not a human slug) and now cross-references sessions and their parent events for real. The top nav's global "Schedule" link was removed, since there's no longer a single schedule to point it at.
+
+**Not built**: an organizer-facing UI to create speakers. `organizer-portal`'s Event Detail "Add Session" button now opens a real modal (`components/AddSessionModal.tsx`) that calls `session_create` and picks an existing speaker from a dropdown fed by `speaker_list`, but there is no UI to create a *new* speaker — new speakers still have to be seeded directly via the API using an operator's own Cognito token.
+
+## Event images: a real feature, added after organizer-portal was wired
+
+Create Event's "Event Branding" section originally had a decorative hero-image upload with no backend behind it (see below). It was promoted to a real feature after a user asked why event images weren't showing on the Events list — the icons there turned out to be from an invented mock `icon` field with nothing real behind it either.
+
+**New infrastructure** (`infrastructure/modules/s3_images`): an `event-ticketing-images-{environment}-{account_id}` S3 bucket. Objects are world-readable via bucket policy (event hero images are public marketing assets, same trust model as the images on any public event page); ACLs stay blocked. CORS is wide open (`allowed_origins = ["*"]`) since neither frontend has a fixed hosting domain yet (S3+CloudFront hosting is still future work) — browsers need bucket-level CORS to complete a direct PUT upload even with a valid presigned URL, so this had to be configured for the upload flow to work at all. Tighten origins once real hosting domains exist.
+
+**New endpoint**: `POST /uploads/image-url` maps to `image_upload_url` (organizer only, covered by `tests/test_api.py`). Takes `{content_type}` (must be `image/jpeg`, `image/png`, or `image/webp`), returns a presigned S3 PUT URL plus the final public `image_url`. The upload itself happens directly from the browser straight to S3 (not proxied through the Lambda/API Gateway, which would hit payload-size limits for anything but tiny images); the org-portal or public event only needs to record the resulting URL string.
+
+**`event_create` change**: accepts an optional `image_url` in the request body and stores it verbatim on the event item if present — no validation that it's actually a URL from this bucket, same trust model as any other organizer-supplied field. The upload has to complete *before* `POST /events` is called, since `event_create` generates the `event_id` server-side and there's no `event_update` endpoint to attach an image after the fact.
+
+**Frontend**: `organizer-portal/app/(console)/events/new/page.tsx` has a real "Event Image" section (file picker, local preview via `URL.createObjectURL`, uploads on submit through `lib/api.ts`'s `uploadEventImage()`). The Events list and Event Detail pages show the real image when present, falling back to a generic icon when not. `public-portal`'s `EventCard` and event detail hero both render the real image the same way. No image-editing, cropping, or replacement UI exists — uploading a new image on an existing event isn't supported, since there's no `event_update` endpoint.
+
+## Not backed by any Lambda (frontend-only, mock data, do not build backend support for these)
+
+- **Organizer**: Configuration Studio's Ticketing Inventory section (price tiers) and Event Branding's accent-color/live-preview sub-section were removed outright (not just left mock) when Create Event was wired to `POST /events`, since there's no ticket-tier, pricing, or branding-color field anywhere in the schema. Event Branding's hero-image upload, however, is now a real feature (see above), not mock. Settings' Organization Profile, Team Management, API & Integrations, and Billing tabs remain entirely mock — there is no organization/team/billing concept in this system at all, and Settings was intentionally left out of the real-data wiring pass. Dashboard's Quick Actions panel is real (links only); its old Recent Activity and Top Performer panels were replaced with ones computed from real registrations and events (see Deployment status). Event Detail's old Traffic Sources and Optimization Tip panel was removed (no analytics data exists to back it); its Registrations/Sessions/Status stat cards are all derived from real data instead.
+
+## Auth reconciliation (Step 21), resolved
+
+- Self-service sign-up needed no extra Cognito configuration: `admin_create_user_config` was left unset on `aws_cognito_user_pool.organizers`, which defaults to allowing public sign-up. Both `organizer-portal`'s real `/signup` call and the `admin-create-user` bootstrap coexist without conflict.
+- `organizer-portal`'s `/login`, `/signup`, and `/forgot-password` pages are now wired to real Amplify calls (`signIn`, `signUp`, `confirmSignUp`, `resetPassword`, `confirmResetPassword` from `aws-amplify/auth`, in `organizer-portal/lib/auth.ts`). The "Organization Name" field on `/signup` was dropped: `aws_cognito_user_pool.organizers` has no custom schema attribute to store it in, and adding one wasn't worth a Terraform change for a field nothing reads.
+- **Auth flow gotcha**: `aws_cognito_user_pool_client.organizers` only enables `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH` (no SRP). Amplify's `signIn()` defaults to `USER_SRP_AUTH` and fails with `"USER_SRP_AUTH is not enabled for the client"` unless called with `options: { authFlowType: "USER_PASSWORD_AUTH" }` — caught via a real browser login attempt, not by the type-checker or tests, since Amplify accepts the option silently either way.
+- `app/(console)/layout.tsx` now wraps every console route in `components/AuthGuard.tsx`, a client component that calls `getCurrentUser()` on mount and redirects to `/login` if there's no session. `components/Topbar.tsx` shows the signed-in user's email and a working Sign Out control (`signOut()` then redirect to `/login`).
+
+## Field-naming note
+
+`organizer-portal` is now on the same contract as `public-portal`: `event_id` / `event_name` / `registered_count` / ... field names throughout, and the `available | limited | full | cancelled` status enum. Unlike `public-portal/lib/api.ts`, `organizer-portal/lib/api.ts` has no mock-data fallback branch — `organizer-portal/lib/mock-data.ts` was deleted rather than rewritten, and the real API types (`EventRecord`, `Registration`, `Session`, `Speaker`) live directly in `lib/api.ts`. This was a deliberate choice: by the time `organizer-portal` was wired, the backend was already live and stable, so a "no API configured" fallback mode had no real use case left and would only have been dead code to maintain. `organizer-portal/lib/api.ts` implements `listEvents`, `getEvent`, `createEvent`, `listRegistrations`, `listAllRegistrations`, `listSessions`, `createSession`, `listSpeakers`, and `createRegistration` (used by the Attendees page's "Add Attendee" modal, which calls the same public `registration_create` endpoint `public-portal` uses).
+
+## Deployment status
+
+The backend is live in AWS (`us-east-1`, account `343073438650`, stage `dev`) with all 15 Lambda functions, all four DynamoDB tables (`events`, `registrations`, `sessions`, `speakers`), one S3 bucket for event images, the Cognito user pool, CloudWatch alarms, and a $1 monthly budget alert. Both frontends are fully wired to it. `public-portal` uses `.env.local` with `NEXT_PUBLIC_API_URL` and falls back to mock data if unset; verified end-to-end (list, detail, register, ticket lookup, email lookup, schedule, speakers, CORS, event images). `organizer-portal` uses `.env.local` with `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_COGNITO_USER_POOL_ID`, and `NEXT_PUBLIC_COGNITO_CLIENT_ID`, with no fallback mode (see Field-naming note); verified end-to-end through a real browser session — Cognito login (including the `USER_PASSWORD_AUTH` flow fix above), dashboard metrics, event list/detail, Create Event (including image upload), Add Session, Attendees list/filter/CSV export/Add Attendee, and Sign Out. The image upload flow (presign → direct browser PUT to S3 → public GET) was verified independently via curl, including the auth boundary and content-type validation.
