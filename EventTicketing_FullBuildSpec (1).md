@@ -1,7 +1,7 @@
 # Event Registration and Ticketing System — Full Build Specification
 **Serverless REST API on AWS | getINNOtized x Azubi Africa Capstone**
 
-> Claude Code Build Document | Aliu Tijani | July 2026
+> Build Specification | Aliu Tijani | July 2026
 
 | Field | Value |
 |---|---|
@@ -10,7 +10,6 @@
 | Stack | AWS Lambda (Python 3.12), API Gateway, DynamoDB, CloudWatch, SNS, GitHub Actions, Terraform |
 | Region | us-east-1 |
 | Developer | Aliu Tijani — aliutijani21@gmail.com |
-| Prerequisite | PayTrack Africa complete. All Terraform, Lambda, API Gateway, and CI/CD patterns apply directly. |
 
 ---
 
@@ -36,13 +35,10 @@ GitHub Repository
 
 ---
 
-## Global Rules for Claude Code
+## Engineering Principles
 
-- Stop at every STOP AND REPORT checkpoint before proceeding.
 - No manual console clicks for any infrastructure. Everything in Terraform.
 - Least privilege IAM on all Lambda roles.
-- No em dashes in any generated prose, comments, or documentation.
-- Follow all patterns from PayTrack Africa. Module structure, Lambda handler pattern, bootstrap sequence, and GitHub Actions pipeline are identical.
 
 ---
 
@@ -251,8 +247,6 @@ Write `infrastructure/main.tf` calling all modules in dependency order:
 
 Root outputs: `api_url`, `events_table_name`, `registrations_table_name`, `sns_topic_arn`
 
-> **STOP AND REPORT** — Run `terraform init` and `terraform validate`. Report full output before writing Lambda handlers.
-
 ---
 
 # Step 7: Lambda Handler Code
@@ -318,8 +312,6 @@ Logic:
 
 All `requirements.txt` files: `boto3`
 
-> **STOP AND REPORT** — All 6 handlers written and reviewed.
-
 ---
 
 # Step 8: Packaging Script
@@ -345,8 +337,6 @@ done
 
 echo "All packages created in infrastructure/packages/"
 ```
-
-> **STOP AND REPORT** — Run `bash scripts/package_lambdas.sh` and confirm 6 zip files exist.
 
 ---
 
@@ -459,8 +449,6 @@ terraform plan -var="state_bucket_name=event-ticketing-tf-state-2026"
 terraform apply -var="state_bucket_name=event-ticketing-tf-state-2026"
 ```
 
-> **STOP AND REPORT** — `terraform apply` completes with zero errors. Paste full Outputs block.
-
 ---
 
 # Step 11: AWS Budgets Setup
@@ -513,8 +501,6 @@ Write `tests/test_api.py` using `moto`. Required test cases:
 - `test_register_full_event`: registering for a full event returns 400
 - `test_register_duplicate`: same email registering twice for same event returns 409
 - `test_list_registrations`: registrations for an event listed correctly
-
-> **STOP AND REPORT** — All 13 tests pass with `pytest tests/ -v`. Paste full output.
 
 ---
 
@@ -569,18 +555,6 @@ The project is complete when all of the following are confirmed:
 - CloudWatch alarms created and visible in AWS console
 - AWS Budget alert configured
 - `terraform destroy` followed by `terraform apply` recreates the full environment in under 10 minutes
-
----
-
-# How to Use This Document
-
-Open a Claude Code session. Upload or paste this document. Say:
-
-> "Read this build specification and follow it exactly, starting with Step 1. Stop at every STOP AND REPORT checkpoint before continuing."
-
-When you hit a STOP AND REPORT checkpoint, paste the output before proceeding.
-
-All Terraform module structure, Lambda handler patterns, packaging script, and CI/CD pipeline patterns are identical to PayTrack Africa. Reference that project for any pattern that feels unfamiliar.
 
 ---
 
@@ -1066,8 +1040,6 @@ const nextConfig = {
 module.exports = nextConfig;
 ```
 
-> **STOP AND REPORT** — Frontend deployed. Visit the CloudFront URL and confirm the event list loads, selecting an event shows the registration form, and completing registration shows the ticket number confirmation.
-
 ---
 
 ## Updated Acceptance Criteria
@@ -1198,8 +1170,6 @@ resource "aws_api_gateway_authorizer" "cognito" {
 Add outputs: `cognito_user_pool_id`, `cognito_client_id`
 
 Run `terraform apply` after making these changes.
-
-> **STOP AND REPORT** — Confirm `POST /events` without a JWT token returns 401 Unauthorized. Confirm `GET /events` still returns events without a token.
 
 ---
 
@@ -1532,8 +1502,6 @@ aws cognito-idp admin-create-user \
 ```
 
 On first login, Cognito prompts the organizer to set a permanent password.
-
-> **STOP AND REPORT** — Both portals deployed. Confirm: (1) public portal loads and registration works without login. (2) Organizer portal redirects to /login when not authenticated. (3) After login, organizer can create events and view registrations. (4) CSV export downloads correctly. (5) New event created by organizer appears immediately in the public portal event list.
 
 ---
 
