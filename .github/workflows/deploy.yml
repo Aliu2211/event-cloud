@@ -10,7 +10,10 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  TF_VERSION: 1.6.0
+  # Old pinned CLI versions can start failing provider signature checks as
+  # HashiCorp rotates their signing key over time ("openpgp: key expired");
+  # keep this close to the locally-used version to avoid that.
+  TF_VERSION: 1.15.6
 
 jobs:
   test:
