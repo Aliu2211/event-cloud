@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Topbar } from "@/components/Topbar";
 import { AddAttendeeModal } from "@/components/AddAttendeeModal";
-import { listAllRegistrations, listEvents, type EventRecord, type Registration } from "@/lib/api";
+import { cancelRegistration, listAllRegistrations, listEvents, type EventRecord, type Registration } from "@/lib/api";
 
 function initials(name: string): string {
   return name
@@ -42,6 +42,7 @@ export default function AttendeesPage() {
   );
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAddAttendee, setShowAddAttendee] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([listEvents(), listAllRegistrations()])
@@ -73,6 +74,24 @@ export default function AttendeesPage() {
   const confirmedCount = registrations.filter((r) => r.status === "confirmed").length;
   const cancelledCount = registrations.filter((r) => r.status === "cancelled").length;
   const eventsRepresented = new Set(registrations.map((r) => r.event_id)).size;
+
+  async function handleCancel(registration: Registration) {
+    if (!window.confirm(`Cancel ${registration.participant_name}'s registration?`)) return;
+    setError("");
+    setCancellingId(registration.registration_id);
+    try {
+      await cancelRegistration(registration.registration_id);
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.registration_id === registration.registration_id ? { ...r, status: "cancelled" } : r,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to cancel registration.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   function handleExportCsv() {
     const csv = toCsv(filtered, eventsById);
@@ -200,12 +219,15 @@ export default function AttendeesPage() {
                 <th className="px-6 py-4 text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">
                   Registration Date
                 </th>
+                <th className="px-6 py-4 text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-on-surface-variant">
+                  <td colSpan={6} className="px-6 py-10 text-center text-on-surface-variant">
                     No attendees match your filters.
                   </td>
                 </tr>
@@ -243,6 +265,18 @@ export default function AttendeesPage() {
                       month: "short",
                       day: "numeric",
                     })}
+                  </td>
+                  <td className="px-6 py-2 text-right">
+                    {registration.status === "confirmed" && (
+                      <button
+                        type="button"
+                        onClick={() => handleCancel(registration)}
+                        disabled={cancellingId === registration.registration_id}
+                        className="text-xs font-medium text-error hover:underline disabled:opacity-60"
+                      >
+                        {cancellingId === registration.registration_id ? "Cancelling..." : "Cancel"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

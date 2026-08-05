@@ -181,3 +181,10 @@ export async function createRegistration(eventId: string, payload: CreateRegistr
   if (!res.ok) throw new Error("Failed to register attendee.");
   return res.json();
 }
+
+export async function cancelRegistration(registrationId: string): Promise<void> {
+  const res = await fetch(`${API}/registrations/${registrationId}`, { method: "DELETE" });
+  if (res.status === 404) throw new Error("Registration not found.");
+  if (res.status === 400) throw new Error("Registration is already cancelled.");
+  if (!res.ok) throw new Error("Failed to cancel registration.");
+}
