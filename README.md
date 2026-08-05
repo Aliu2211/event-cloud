@@ -2,7 +2,11 @@
 
 A serverless REST API on AWS that replaces Microsoft Forms + Excel for event registration — built for the getINNOtized x Azubi Africa Capstone.
 
-**Live API**: `https://0cwi0mp3y9.execute-api.us-east-1.amazonaws.com/dev`
+**Live frontends** (Vercel):
+- Public portal — https://public-portal-seven.vercel.app (runs on mock data; works standalone)
+- Organizer console — https://organizer-portal-five.vercel.app (needs a live API + Cognito to actually load data or sign in — see note below)
+
+**Live API**: torn down between work sessions to stay inside the Free Tier and avoid idle cost — see [Running it yourself](#running-it-yourself) to redeploy. `terraform apply` reprovisions the whole backend in one command; `terraform destroy` tears it back down.
 
 ## The problem
 

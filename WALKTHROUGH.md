@@ -69,6 +69,8 @@ Push a commit, open the Actions tab on GitHub, show the `test` job running the s
 
 ## Links
 
-- API: see `terraform output api_url` (redeployed periodically during development, so check current output rather than any URL quoted elsewhere)
+- Public portal (live, mock data): https://public-portal-seven.vercel.app
+- Organizer console (live shell; needs a live API + Cognito to actually function): https://organizer-portal-five.vercel.app
+- API: see `terraform output api_url` — the backend is torn down between work sessions to avoid idle cost, so redeploy with `terraform apply` before demoing live data, and check current output rather than any URL quoted elsewhere
 - Repo: `https://github.com/Aliu2211/event-cloud`
 - Tests: `.venv/bin/pytest tests/ -v` — 39 passing
