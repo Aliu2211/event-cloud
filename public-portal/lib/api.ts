@@ -107,6 +107,29 @@ export async function getRegistration(registrationId: string): Promise<Registrat
   return res.json();
 }
 
+export async function cancelRegistration(registrationId: string): Promise<void> {
+  if (!API) {
+    await delay();
+    const registration = mockRegistrations.find((r) => r.registration_id === registrationId);
+    if (!registration) throw new Error("Registration not found.");
+    if (registration.status === "cancelled") throw new Error("Registration is already cancelled.");
+    registration.status = "cancelled";
+    const event = getMockEvent(registration.event_id);
+    if (event) {
+      event.registered_count = Math.max(event.registered_count - 1, 0);
+      const fillRatio = event.registered_count / event.capacity;
+      if (event.status !== "cancelled") {
+        event.status = fillRatio >= 1 ? "full" : fillRatio >= 0.8 ? "limited" : "available";
+      }
+    }
+    return;
+  }
+  const res = await fetch(`${API}/registrations/${registrationId}`, { method: "DELETE" });
+  if (res.status === 404) throw new Error("Registration not found.");
+  if (res.status === 400) throw new Error("Registration is already cancelled.");
+  if (!res.ok) throw new Error("Failed to cancel registration.");
+}
+
 export async function getRegistrationsByEmail(email: string): Promise<Registration[]> {
   if (!API) {
     await delay();
