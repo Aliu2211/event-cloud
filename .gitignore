@@ -11,3 +11,4 @@ node_modules/
 .next/
 out/
 .venv
+stitch_serverless_event_ticketing_system/
