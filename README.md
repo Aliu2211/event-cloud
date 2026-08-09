@@ -20,6 +20,33 @@ GitHub push triggers GitHub Actions, which runs the test suite then `terraform a
 
 Every function has its own IAM role scoped to only the table actions it actually performs (least privilege) — see `infrastructure/modules/lambda/main.tf`.
 
+## Screenshots
+
+Live captures from the deployed frontends (not mockups):
+
+| Public portal — event list | Public portal — event + registration |
+|---|---|
+| ![Public portal home page listing events](docs/screenshots/public-portal-home.png) | ![Public portal event detail with registration form](docs/screenshots/public-portal-event-detail.png) |
+
+| Organizer console — sign in |
+|---|
+| ![Organizer console login page](docs/screenshots/organizer-portal-login.png) |
+
+The public portal above is rendering its built-in mock-data fallback (no live API is configured on this deployment right now — see "Live API" note up top). The organizer console needs a live API + Cognito pool to get past this screen; it's shown here to demonstrate the UI, not a working session.
+
+## Notes: decisions and things that broke
+
+A condensed version of the fuller write-up in [`WALKTHROUGH.md`](WALKTHROUGH.md):
+
+- **DynamoDB rejects empty strings as GSI key values.** A session with no assigned speaker can't have `speaker_id: ""` on the `speaker-index` GSI — every write failed until the attribute was omitted entirely instead of defaulted to empty.
+- **`json.dumps` doesn't know what to do with DynamoDB's `Decimal` type.** Every handler carries a small custom encoder that converts whole numbers to `int` and fractional ones to `float`.
+- **API Gateway won't answer CORS preflight on its own.** Lambda proxy integrations only handle the HTTP method they're bound to; every browser-facing resource needed an explicit `OPTIONS` method backed by a `MOCK` integration.
+- **Two path parameters can't share one API Gateway resource.** The spec's literal `GET /registrations/{email}` collides with the already-shipped `GET /registrations/{registration_id}` — API Gateway resolves one path-parameter name per position. Resolved by making `registration_get` sniff the path segment for `@` instead of adding a second, conflicting resource.
+- **Cognito's app client only allows `USER_PASSWORD_AUTH`; the Amplify SDK defaults to SRP.** Login failed silently until the sign-in call explicitly requested the enabled flow — caught only by testing an actual browser login, not by any automated test.
+- **Retrofitting least-privilege IAM meant a full stack teardown and redeploy**, not an in-place patch: moving 16 functions from one shared role to one scoped role each changes every function's role binding at once.
+- **CloudWatch alarms needed to be a rate, not a count.** "5 errors in 5 minutes" means something different at 10 requests a day versus 10,000; a metric-math expression (`errors ÷ invocations × 100`) turns the alarm into an actual percentage.
+- **CI's pinned Terraform 1.6.0 started failing provider signature checks it used to pass** (`openpgp: key expired`) — a ~2023-era CLI eventually stops trusting a provider release signed with a since-rotated HashiCorp key. Fixed by bumping the pinned CLI version to match what's used locally.
+
 ## API endpoints
 
 Public endpoints need no auth. Organizer endpoints require a Cognito ID token (`Authorization: <token>` header) from a user in the `organizers` pool.
