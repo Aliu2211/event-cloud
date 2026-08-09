@@ -38,11 +38,25 @@ Live captures from the deployed frontends (not mockups) — the public portal is
 |---|---|---|
 | ![Inline ticket confirmation after registering](docs/screenshots/public-portal-registration-confirmation.png) | ![My Tickets search form](docs/screenshots/public-portal-my-tickets-empty.png) | ![My Tickets results for the email just registered](docs/screenshots/public-portal-my-tickets-results.png) |
 
-**Organizer console** — needs a live API + Cognito pool to actually load data or sign in; shown here to demonstrate the UI itself, not a working session. The guarded-route screenshot documents that honestly: hitting `/dashboard` with no session bounces straight back to `/login`, exactly as it should.
+**Organizer console** — needs a live API + Cognito pool to load data or sign in, so these were captured during a temporary redeploy (real backend, real Cognito session, real seeded events/registrations), then the stack was torn back down. The guarded-route screenshot documents the auth boundary honestly: hitting `/dashboard` with no session bounces straight back to `/login`, exactly as it should.
 
 | Sign in | Create account | Forgot password | `/dashboard` with no session |
 |---|---|---|---|
 | ![Organizer console login page](docs/screenshots/organizer-portal-login.png) | ![Organizer console signup page](docs/screenshots/organizer-portal-signup.png) | ![Organizer console forgot password flow](docs/screenshots/organizer-portal-forgot-password.png) | ![Unauthenticated dashboard request redirected to login](docs/screenshots/organizer-portal-console-guarded.png) |
+
+Signed in, against a real backend:
+
+| Dashboard | All Events |
+|---|---|
+| ![Organizer dashboard with real registration counts and recent activity](docs/screenshots/organizer-portal-dashboard.png) | ![Events list with real capacity and registration progress](docs/screenshots/organizer-portal-events-list.png) |
+
+| Create Event | Event detail |
+|---|---|
+| ![Create event configuration form](docs/screenshots/organizer-portal-create-event.png) | ![Single event detail with live registration count](docs/screenshots/organizer-portal-event-detail.png) |
+
+| Manage Attendees | Console Settings |
+|---|---|
+| ![Attendees table across all events with cancel action](docs/screenshots/organizer-portal-attendees.png) | ![Console settings page](docs/screenshots/organizer-portal-settings.png) |
 
 ## Notes: decisions and things that broke
 
