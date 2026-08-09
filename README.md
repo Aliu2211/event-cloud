@@ -22,17 +22,27 @@ Every function has its own IAM role scoped to only the table actions it actually
 
 ## Screenshots
 
-Live captures from the deployed frontends (not mockups):
+Live captures from the deployed frontends (not mockups) — the public portal is running its built-in mock-data fallback since no live API is configured on this deployment right now (see the "Live API" note up top); every registration/lookup screen below is the result of an actual form submission against that mock data, not a staged image.
 
-| Public portal — event list | Public portal — event + registration |
+**Public portal**
+
+| Event list | Event detail + registration form |
 |---|---|
 | ![Public portal home page listing events](docs/screenshots/public-portal-home.png) | ![Public portal event detail with registration form](docs/screenshots/public-portal-event-detail.png) |
 
-| Organizer console — sign in |
-|---|
-| ![Organizer console login page](docs/screenshots/organizer-portal-login.png) |
+| Session schedule | Speaker profile |
+|---|---|
+| ![Event schedule grouped by day and track](docs/screenshots/public-portal-schedule.png) | ![Speaker profile with their sessions across events](docs/screenshots/public-portal-speaker-profile.png) |
 
-The public portal above is rendering its built-in mock-data fallback (no live API is configured on this deployment right now — see "Live API" note up top). The organizer console needs a live API + Cognito pool to get past this screen; it's shown here to demonstrate the UI, not a working session.
+| Registration confirmed | My Tickets — before search | My Tickets — found by email |
+|---|---|---|
+| ![Inline ticket confirmation after registering](docs/screenshots/public-portal-registration-confirmation.png) | ![My Tickets search form](docs/screenshots/public-portal-my-tickets-empty.png) | ![My Tickets results for the email just registered](docs/screenshots/public-portal-my-tickets-results.png) |
+
+**Organizer console** — needs a live API + Cognito pool to actually load data or sign in; shown here to demonstrate the UI itself, not a working session. The guarded-route screenshot documents that honestly: hitting `/dashboard` with no session bounces straight back to `/login`, exactly as it should.
+
+| Sign in | Create account | Forgot password | `/dashboard` with no session |
+|---|---|---|---|
+| ![Organizer console login page](docs/screenshots/organizer-portal-login.png) | ![Organizer console signup page](docs/screenshots/organizer-portal-signup.png) | ![Organizer console forgot password flow](docs/screenshots/organizer-portal-forgot-password.png) | ![Unauthenticated dashboard request redirected to login](docs/screenshots/organizer-portal-console-guarded.png) |
 
 ## Notes: decisions and things that broke
 
